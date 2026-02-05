@@ -6,7 +6,7 @@
     },
     {
       "source": "/api/:path*",
-      "destination": "https://porto.apprentice.cyou/api/:path*"
+      "destination": "https://rdsmahato.my.id/api/:path*"
     },
     {
       "source": "/(.*)",

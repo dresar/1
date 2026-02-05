@@ -430,6 +430,17 @@ export const api = {
     delete: async (id: number): Promise<void> => {
       await apiClient.delete(`/projects/${id}`);
     },
+    getById: async (id: number): Promise<Project> => {
+      const response = await apiClient.get<Project>(`/projects/${id}/details`);
+      return response.data;
+    },
+    createSummary: async (projectId: number, data: { content: string; variant?: string }): Promise<any> => {
+      const response = await apiClient.post(`/projects/${projectId}/summaries`, data);
+      return response.data;
+    },
+    deleteSummary: async (summaryId: number): Promise<void> => {
+      await apiClient.delete(`/projects/summaries/${summaryId}`);
+    },
   },
 
   projectCategories: {
@@ -507,44 +518,6 @@ export const api = {
     },
   },
 
-  // ----------------------------------------
-  // Projects
-  // ----------------------------------------
-  projects: {
-    getAll: async (params?: any): Promise<Project[]> => {
-      const response = await apiClient.get<any>('/projects', { params });
-      if (Array.isArray(response.data)) {
-        return response.data;
-      } else if (response.data && Array.isArray(response.data.data)) {
-        return response.data.data;
-      }
-      return [];
-    },
-    getById: async (id: number): Promise<Project> => {
-        const response = await apiClient.get<Project>(`/projects/${id}/details`);
-        return response.data;
-    },
-    create: async (data: any): Promise<Project> => {
-      const response = await apiClient.post<Project>('/projects', data);
-      return response.data;
-    },
-    update: async (id: number, data: any): Promise<Project> => {
-      const response = await apiClient.put<Project>(`/projects/${id}`, data);
-      return response.data;
-    },
-    delete: async (id: number): Promise<void> => {
-      await apiClient.delete(`/projects/${id}`);
-    },
-    
-    // Summaries
-    createSummary: async (projectId: number, data: { content: string, variant?: string }): Promise<any> => {
-        const response = await apiClient.post(`/projects/${projectId}/summaries`, data);
-        return response.data;
-    },
-    deleteSummary: async (summaryId: number): Promise<void> => {
-        await apiClient.delete(`/projects/summaries/${summaryId}`);
-    }
-  },
 
   // ----------------------------------------
   // Experience

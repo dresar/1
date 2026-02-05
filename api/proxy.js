@@ -1,7 +1,7 @@
 export default async function handler(request, response) {
   const { endpoint } = request.query;
-  // HARDCODE URL BACKEND DI SINI
-  const backendUrl = "https://porto.apprentice.cyou/api" + endpoint;
+  const base = process.env.BACKEND_URL || "https://rdsmahato.my.id";
+  const backendUrl = `${base}/api${endpoint}`;
 
   try {
     const apiRes = await fetch(backendUrl);
