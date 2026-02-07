@@ -39,6 +39,7 @@ const SkillList = lazy(() => import("./admin/pages/skills/SkillList"));
 const EducationList = lazy(() => import("./admin/pages/education/EducationList"));
 const EducationForm = lazy(() => import("./admin/pages/education/EducationForm"));
 const CertificateList = lazy(() => import("./admin/pages/certificates/CertificateList"));
+const CertificateForm = lazy(() => import("./admin/pages/certificates/CertificateForm"));
 const WATemplateList = lazy(() => import("./admin/pages/communication/WATemplateList"));
 const ExperienceList = lazy(() => import("./admin/pages/experience/ExperienceList"));
 const ExperienceForm = lazy(() => import("./admin/pages/experience/ExperienceForm"));
@@ -129,6 +130,8 @@ const App = () => {
 
                     {/* Certificates */}
                     <Route path="certificates" element={<CertificateList />} />
+                    <Route path="certificates/new" element={<CertificateForm />} />
+                    <Route path="certificates/edit/:id" element={<CertificateForm />} />
 
                     {/* Communication */}
                     <Route path="communication/wa" element={<WATemplateList />} />

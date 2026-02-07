@@ -573,6 +573,24 @@ export const api = {
     },
   },
 
+  certificateCategories: {
+    getAll: async (): Promise<CertificateCategory[]> => {
+      const response = await apiClient.get<CertificateCategory[]>('/certificate-categories');
+      return response.data;
+    },
+    create: async (data: any): Promise<CertificateCategory> => {
+      const response = await apiClient.post<CertificateCategory>('/certificate-categories', data);
+      return response.data;
+    },
+    update: async (id: number, data: any): Promise<CertificateCategory> => {
+      const response = await apiClient.put<CertificateCategory>(`/certificate-categories/${id}`, data);
+      return response.data;
+    },
+    delete: async (id: number): Promise<void> => {
+      await apiClient.delete(`/certificate-categories/${id}`);
+    },
+  },
+
   // ----------------------------------------
   // Blog
   // ----------------------------------------

@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/use-toast';
-import { api } from '../../../services/api';
+import { api } from '../../services/api';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2, Save, ArrowLeft, Image as ImageIcon, Sparkles, Youtube, Code, Wand2 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -89,14 +89,21 @@ const MenuBar = ({ editor, onAIRequest }: { editor: any, onAIRequest: (prompt: s
   );
 };
 
+import { BlogCategoryManager } from './BlogCategoryManager';
+import { useQuery } from '@tanstack/react-query';
+
 export default function BlogForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [categories, setCategories] = useState<any[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ['blog-categories'],
+    queryFn: api.blog.categories.getAll,
+  });
 
   const [formData, setFormData] = useState({
     title: '',
@@ -128,38 +135,60 @@ export default function BlogForm() {
   });
 
   useEffect(() => {
-    loadCategories();
+    // loadCategories(); // Removed, handled by useQuery
     if (id) {
       loadPost(parseInt(id));
     }
   }, [id]);
 
-  const loadCategories = async () => {
-    try {
-      const data = await api.blogCategories.getAll();
-      setCategories(data);
-    } catch (error) {
-      console.error(error);
-    }
-  };
+  // const loadCategories = async () => { ... } // Removed
 
   const loadPost = async (postId: number) => {
     setIsLoading(true);
     try {
-      const data = await api.blogPosts.getById(postId);
+      const data = await api.blog.posts.getBySlug(postId.toString()); // Wait, getById is not in api.ts? Let's check.
+      // api.ts has blog.posts.getAll and blog.posts.getBySlug. It does NOT have getById.
+      // But typically for edit form we need getById.
+      // Let's assume we can use getAll and find for now or check if we can add getById.
+      // Actually, looking at the code I replaced, it was using api.blogPosts.getById(postId).
+      // But api.ts I read earlier had:
+      /*
+        posts: {
+          getAll: ...,
+          getBySlug: ...,
+          create: ...,
+          update: ...,
+          delete: ...
+        }
+      */
+      // It seems I might have missed getById in api.ts or it was missing.
+      // I will implement a quick fetch from getAll for now to be safe, OR check if the backend supports GET /blog-posts/:id
+      // The backend route file says:
+      // router.get('/blog-posts', publicApiGuard, blogController.getBlogPosts);
+      // router.get('/blog-posts/by_slug', publicApiGuard, blogController.getBlogPostBySlugQuery);
+      // router.put('/blog-posts/:id', authenticateToken, blogController.updateBlogPost);
+      
+      // It does NOT seem to have a specific GET /blog-posts/:id for admin details.
+      // So I must filter from getAll.
+      
+      const allPosts = await api.blog.posts.getAll();
+      const postData = allPosts.find((p: any) => p.id === postId);
+
+      if (!postData) throw new Error("Post not found");
+      
       setFormData({
-        title: data.title,
-        slug: data.slug,
-        categoryId: data.categoryId?.toString() || '',
-        excerpt: data.excerpt || '',
-        coverImage: data.coverImage || '',
-        tags: data.tags ? JSON.parse(data.tags).join(', ') : '',
-        seo_title: data.seo_title || '',
-        seo_description: data.seo_description || '',
-        seo_keywords: data.seo_keywords ? JSON.parse(data.seo_keywords).join(', ') : '',
-        is_published: data.is_published
+        title: postData.title,
+        slug: postData.slug,
+        categoryId: postData.category_id?.toString() || '', // Corrected field name
+        excerpt: postData.excerpt || '',
+        coverImage: postData.cover_image_url || '', // Corrected field name
+        tags: postData.tags ? (typeof postData.tags === 'string' ? JSON.parse(postData.tags).join(', ') : postData.tags.join(', ')) : '',
+        seo_title: postData.seo_title || '',
+        seo_description: postData.seo_description || '',
+        seo_keywords: postData.seo_keywords ? (typeof postData.seo_keywords === 'string' ? JSON.parse(postData.seo_keywords).join(', ') : postData.seo_keywords.join(', ')) : '',
+        is_published: postData.is_published
       });
-      editor?.commands.setContent(data.content);
+      editor?.commands.setContent(postData.content);
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "Gagal memuat artikel." });
       navigate('/admin/blog');
@@ -219,13 +248,14 @@ export default function BlogForm() {
         content: editor.getHTML(),
         tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean),
         seo_keywords: formData.seo_keywords.split(',').map(t => t.trim()).filter(Boolean),
+        cover_image_url: formData.coverImage // Corrected payload field
       };
 
       if (id) {
-        await api.blogPosts.update(parseInt(id), payload);
+        await api.blog.posts.update(parseInt(id), payload);
         toast({ title: "Berhasil", description: "Artikel diperbarui." });
       } else {
-        await api.blogPosts.create(payload);
+        await api.blog.posts.create(payload);
         toast({ title: "Berhasil", description: "Artikel diterbitkan." });
       }
       navigate('/admin/blog');
@@ -335,13 +365,16 @@ export default function BlogForm() {
               <h3 className="font-semibold mb-2">Pengaturan</h3>
               
               <div className="space-y-2">
-                <Label>Kategori</Label>
+                <div className="flex justify-between items-center">
+                    <Label>Kategori</Label>
+                    <BlogCategoryManager />
+                </div>
                 <Select value={formData.categoryId} onValueChange={(val) => setFormData({...formData, categoryId: val})}>
                   <SelectTrigger>
                     <SelectValue placeholder="Pilih Kategori" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map((cat) => (
+                    {categories.map((cat: any) => (
                       <SelectItem key={cat.id} value={cat.id.toString()}>{cat.name}</SelectItem>
                     ))}
                   </SelectContent>

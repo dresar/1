@@ -1,12 +1,9 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { api } from '../../services/api';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Plus, 
   Trash2, 
@@ -15,39 +12,37 @@ import {
   Calendar, 
   Link as LinkIcon, 
   Loader2, 
-  Image as ImageIcon,
   ChevronLeft,
-  ChevronRight 
+  ChevronRight
 } from 'lucide-react';
-import { Save } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useNavigate } from 'react-router-dom';
 
 export default function CertificateList() {
   const [certificates, setCertificates] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
-  const [formData, setFormData] = useState({
-    name: '',
-    issuer: '',
-    issueDate: '',
-    expiryDate: '',
-    credentialUrl: '',
-    image: '',
-    verified: false,
-    credentialId: ''
-  });
-
   useEffect(() => {
     loadCertificates();
+    loadCategories();
   }, []);
+
+  const loadCategories = async () => {
+    try {
+      const res = await api.certificateCategories.getAll();
+      setCategories(res);
+    } catch (e) {
+      console.error("Failed to load categories", e);
+    }
+  };
 
   const loadCertificates = async () => {
     setIsLoading(true);
@@ -62,35 +57,6 @@ export default function CertificateList() {
     }
   };
 
-  const handleOpenModal = (cert?: any) => {
-    if (cert) {
-      setEditingId(cert.id);
-      setFormData({
-        name: cert.name,
-        issuer: cert.issuer,
-        issueDate: cert.issueDate ? new Date(cert.issueDate).toISOString().split('T')[0] : '',
-        expiryDate: cert.expiryDate ? new Date(cert.expiryDate).toISOString().split('T')[0] : '',
-        credentialUrl: cert.credentialUrl || '',
-        image: cert.image || '',
-        verified: cert.verified || false,
-        credentialId: cert.credentialId || ''
-      });
-    } else {
-      setEditingId(null);
-      setFormData({
-        name: '',
-        issuer: '',
-        issueDate: '',
-        expiryDate: '',
-        credentialUrl: '',
-        image: '',
-        verified: false,
-        credentialId: ''
-      });
-    }
-    setIsModalOpen(true);
-  };
-
   const handleDelete = async (id: number) => {
     if (!window.confirm("Yakin ingin menghapus sertifikat ini?")) return;
     try {
@@ -102,108 +68,45 @@ export default function CertificateList() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    try {
-      const payload = {
-        ...formData,
-        issueDate: new Date(formData.issueDate),
-        expiryDate: formData.expiryDate ? new Date(formData.expiryDate) : null,
-        image: formData.image === '' ? null : formData.image,
-        credentialUrl: formData.credentialUrl === '' ? null : formData.credentialUrl,
-        credentialId: formData.credentialId === '' ? null : formData.credentialId,
-      };
-
-      if (editingId) {
-        await api.certificates.update(editingId, payload);
-        toast({ title: "Berhasil", description: "Sertifikat diperbarui." });
-      } else {
-        await api.certificates.create(payload);
-        toast({ title: "Berhasil", description: "Sertifikat ditambahkan." });
-      }
-      setIsModalOpen(false);
-      loadCertificates();
-    } catch (error) {
-      console.error(error);
-      toast({ variant: "destructive", title: "Gagal", description: "Terjadi kesalahan saat menyimpan." });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   // Pagination Logic
-  const totalPages = Math.ceil(certificates.length / itemsPerPage);
+  const filteredCertificates = selectedCategory === "all" 
+      ? certificates 
+      : certificates.filter(c => c.categoryId?.toString() === selectedCategory);
+
+  const totalPages = Math.ceil(filteredCertificates.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = certificates.slice(indexOfFirstItem, indexOfLastItem);
+  const currentItems = filteredCertificates.slice(indexOfFirstItem, indexOfLastItem);
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Sertifikat</h2>
           <p className="text-muted-foreground">Lisensi & Sertifikasi Profesional.</p>
         </div>
-        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => handleOpenModal()}><Plus className="mr-2 h-4 w-4" /> Tambah Sertifikat</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>{editingId ? 'Edit Sertifikat' : 'Tambah Sertifikat Baru'}</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Nama Sertifikat</Label>
-                  <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required placeholder="Contoh: AWS Certified Cloud Practitioner" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Penerbit (Issuer)</Label>
-                  <Input value={formData.issuer} onChange={e => setFormData({...formData, issuer: e.target.value})} required placeholder="Contoh: Amazon Web Services" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Tanggal Terbit</Label>
-                  <Input type="date" value={formData.issueDate} onChange={e => setFormData({...formData, issueDate: e.target.value})} required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tanggal Kadaluarsa (Opsional)</Label>
-                  <Input type="date" value={formData.expiryDate} onChange={e => setFormData({...formData, expiryDate: e.target.value})} />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>ID Kredensial</Label>
-                <Input value={formData.credentialId} onChange={e => setFormData({...formData, credentialId: e.target.value})} placeholder="Contoh: AKIAIOSFODNN7EXAMPLE" />
-              </div>
-              <div className="space-y-2">
-                <Label>URL Kredensial</Label>
-                <Input value={formData.credentialUrl} onChange={e => setFormData({...formData, credentialUrl: e.target.value})} placeholder="https://..." />
-              </div>
-              <div className="space-y-2">
-                <Label>Gambar Sertifikat (URL)</Label>
-                <div className="flex gap-2">
-                    <Input value={formData.image} onChange={e => setFormData({...formData, image: e.target.value})} placeholder="https://..." />
-                    {formData.image && (
-                        <div className="h-10 w-10 rounded border overflow-hidden flex-shrink-0">
-                            <img src={formData.image} className="w-full h-full object-cover" />
-                        </div>
-                    )}
-                </div>
-              </div>
-              
-              <div className="flex justify-end gap-2 mt-4">
-                <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Batal</Button>
-                <Button type="submit" disabled={isSaving}>
-                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                  Simpan
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        
+        <div className="flex gap-2 w-full md:w-auto">
+             <div className="w-[200px]">
+                <Select value={selectedCategory} onValueChange={(val) => { setSelectedCategory(val); setCurrentPage(1); }}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Filter Kategori" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Semua Kategori</SelectItem>
+                        {categories.map((cat: any) => (
+                            <SelectItem key={cat.id} value={cat.id.toString()}>
+                                {cat.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <Button onClick={() => navigate('/admin/certificates/new')}>
+              <Plus className="mr-2 h-4 w-4" /> Tambah Sertifikat
+            </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -251,7 +154,7 @@ export default function CertificateList() {
                     ) : <span></span>}
                     
                     <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenModal(cert)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/admin/certificates/edit/${cert.id}`)}>
                             <Edit className="h-3.5 w-3.5" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(cert.id)}>
@@ -262,6 +165,16 @@ export default function CertificateList() {
             </CardContent>
           </Card>
         ))}
+        {isLoading && (
+          <div className="col-span-full flex justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        {!isLoading && filteredCertificates.length === 0 && (
+          <div className="col-span-full text-center py-8 text-muted-foreground">
+            Tidak ada sertifikat yang ditemukan.
+          </div>
+        )}
       </div>
 
       {/* Pagination Controls */}

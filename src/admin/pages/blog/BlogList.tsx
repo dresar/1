@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { api } from '../../../services/api';
+import { api } from '../../services/api';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Plus, 
   Trash2, 
@@ -26,6 +27,8 @@ import { id as idLocale } from 'date-fns/locale';
 export default function BlogList() {
   const [posts, setPosts] = useState<any[]>([]);
   const [filteredPosts, setFilteredPosts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
@@ -37,39 +40,58 @@ export default function BlogList() {
 
   useEffect(() => {
     loadPosts();
+    loadCategories();
   }, []);
 
   useEffect(() => {
+    let filtered = posts || [];
+
     if (searchQuery) {
-      const filtered = posts.filter(post => 
+      filtered = filtered.filter(post => 
         post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         post.category?.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      setFilteredPosts(filtered);
-      setCurrentPage(1); // Reset to first page on search
-    } else {
-      setFilteredPosts(posts);
     }
-  }, [searchQuery, posts]);
+
+    if (selectedCategory !== "all") {
+        filtered = filtered.filter(post => post.category?.id.toString() === selectedCategory);
+    }
+
+    setFilteredPosts(filtered);
+    setCurrentPage(1); // Reset to first page on search/filter change
+  }, [searchQuery, posts, selectedCategory]);
 
   const loadPosts = async () => {
     setIsLoading(true);
     try {
-      const data = await api.blogPosts.getAll();
-      setPosts(data);
-      setFilteredPosts(data);
+      const data = await api.blog.posts.getAll();
+      setPosts(data || []);
+      setFilteredPosts(data || []);
     } catch (error) {
       console.error(error);
       toast({ variant: "destructive", title: "Error", description: "Gagal memuat artikel blog." });
+      setPosts([]);
+      setFilteredPosts([]);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const loadCategories = async () => {
+    try {
+      const data = await api.blog.categories.getAll();
+      setCategories(data || []);
+    } catch (error) {
+      console.error("Failed to load categories", error);
+      setCategories([]);
+    }
+  };
+
+
   const handleDelete = async (id: number) => {
     if (!window.confirm("Yakin ingin menghapus artikel ini?")) return;
     try {
-      await api.blogPosts.delete(id);
+      await api.blog.posts.delete(id);
       toast({ title: "Berhasil", description: "Artikel dihapus." });
       loadPosts();
     } catch (error) {
@@ -95,14 +117,32 @@ export default function BlogList() {
         </Button>
       </div>
 
-      <div className="flex items-center gap-2 bg-card p-2 rounded-lg border max-w-sm">
-        <Search className="h-4 w-4 text-muted-foreground" />
-        <Input 
-          placeholder="Cari artikel..." 
-          className="border-none shadow-none focus-visible:ring-0 h-8"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+      <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+        <div className="flex items-center gap-2 bg-card p-2 rounded-lg border max-w-sm flex-grow">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Cari artikel..." 
+            className="border-none shadow-none focus-visible:ring-0 h-8"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        <div className="w-[200px]">
+            <Select value={selectedCategory} onValueChange={(val) => { setSelectedCategory(val); setCurrentPage(1); }}>
+                <SelectTrigger>
+                    <SelectValue placeholder="Filter Kategori" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Semua Kategori</SelectItem>
+                    {categories.map((cat: any) => (
+                        <SelectItem key={cat.id} value={cat.id.toString()}>
+                            {cat.name}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
