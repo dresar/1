@@ -18,20 +18,15 @@ import { ScrollToTop } from '@/components/effects/ScrollToTop';
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { projects, isLoading } = useProjects();
+  const { projects, isLoading, isError } = useProjects();
   const { t } = useTranslation();
-  const [project, setProject] = useState<any>(null);
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
 
-  useEffect(() => {
-    if (projects.length > 0 && id) {
-      const foundProject = projects.find((p: any) => p.id === Number(id));
-      if (foundProject) {
-        setProject(foundProject);
-      }
-    }
+  const project = useMemo(() => {
+    if (!projects || !id) return null;
+    return projects.find((p: any) => p.id === Number(id));
   }, [projects, id]);
 
   const allImages = useMemo(() => {
@@ -40,9 +35,27 @@ const ProjectDetail = () => {
     if (project.coverImage || project.thumbnail) {
       images.push(normalizeMediaUrl(project.coverImage || project.thumbnail));
     }
+    
+    // Handle legacy relation
     if (project.images && project.images.length > 0) {
       project.images.forEach((img: any) => images.push(normalizeMediaUrl(img.image)));
     }
+
+    // Handle JSON gallery
+    if (project.gallery) {
+      let gallery = project.gallery;
+      if (typeof gallery === 'string') {
+        try {
+          gallery = JSON.parse(gallery);
+        } catch (e) {
+          gallery = [];
+        }
+      }
+      if (Array.isArray(gallery)) {
+        gallery.forEach((img: string) => images.push(normalizeMediaUrl(img)));
+      }
+    }
+    
     return images;
   }, [project]);
 
@@ -97,7 +110,7 @@ const ProjectDetail = () => {
     );
   }
 
-  if (!project && !isLoading && projects.length > 0) {
+  if (isError || (!isLoading && !project)) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <Header />

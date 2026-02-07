@@ -16,7 +16,7 @@ const navItems = [
   { id: 'projects', label: 'nav.projects', href: '#projects' },
   { id: 'experience', label: 'nav.experience', href: '#experience' },
   { id: 'certificates', label: 'nav.certificates', href: '#certificates' },
-  { id: 'blog', label: 'nav.blog', href: '#blog' }, // Added Blog to nav? No, user said "daftar blog menu". But maybe I should add it? The request didn't explicitly ask to add "Blog" to header menu, just "logo click". I'll stick to logo click.
+  { id: 'blog', label: 'nav.blog', href: '#blog' },
   { id: 'contact', label: 'nav.contact', href: '#contact' },
 ];
 

@@ -19,6 +19,14 @@
     "projects_completed": "Proyek Selesai",
     "years_experience": "Tahun Pengalaman"
   },
+  "seo": {
+    "site_title": "Eka - Full Stack Developer & UI/UX Designer",
+    "site_description": "Portofolio profesional Eka. Menampilkan proyek web development, desain UI/UX, dan keahlian teknis modern.",
+    "site_keywords": "portofolio, web developer, frontend, backend, react, nodejs, ui/ux design, indonesia",
+    "og_title": "Portofolio Eka - Solusi Digital Inovatif",
+    "og_description": "Jelajahi koleksi proyek, pengalaman, dan artikel terbaru seputar teknologi dari Eka.",
+    "author": "Eka"
+  },
   "sections": {
     "about": {
       "title": "Tentang Saya",

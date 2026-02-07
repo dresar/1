@@ -22,3 +22,11 @@ export function useProjects() {
     error: projectsQuery.error,
   };
 }
+
+export function useProject(id: number | string | undefined) {
+  return useQuery({
+    queryKey: ['project', id],
+    queryFn: () => projectsAPI.getById(Number(id)),
+    enabled: !!id,
+  });
+}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Award, Calendar, ExternalLink, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +16,19 @@ export const CertificatesSection = () => {
   const [selectedCategory, setSelectedCategory] = useState<number | 'all'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
+  const [isMobile, setIsMobile] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const { data: categories = [] } = useQuery({
     queryKey: ['certificateCategories'],
@@ -113,6 +126,90 @@ export const CertificatesSection = () => {
           ))}
         </div>
 
+        <div
+          className={isMobile ? "relative w-full overflow-hidden" : ""}
+          ref={containerRef}
+          onTouchStart={() => setIsPaused(true)}
+          onTouchEnd={() => setIsPaused(false)}
+        >
+        {isMobile ? (
+          <motion.div 
+            className="flex gap-6"
+            animate={{
+              x: ["0%", "-50%"]
+            }}
+            transition={{
+              x: {
+                repeat: Infinity,
+                repeatType: "loop",
+                duration: displayedCertificates.length * 5, // Adjust speed based on item count
+                ease: "linear",
+              },
+              playState: isPaused ? "paused" : "running"
+            }}
+            style={{
+              width: "max-content" 
+            }}
+          >
+            {[...displayedCertificates, ...displayedCertificates].map((cert, index) => (
+              <div 
+                key={`${cert.id}-${index}`}
+                className="w-[85vw] max-w-[350px] flex-shrink-0"
+                onClick={() => openCertificateModal(cert)}
+              >
+                <div className="glass-strong rounded-xl overflow-hidden hover:glow-primary transition-all duration-300 cursor-pointer h-full flex flex-col dark:bg-card/50 bg-white shadow-sm hover:shadow-md border border-border/50">
+                  {/* Image/Thumbnail */}
+                  <div className="relative h-48 bg-muted overflow-hidden">
+                    {cert.image ? (
+                      <img
+                        src={normalizeMediaUrl(cert.image)}
+                        alt={cert.name}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-primary/10">
+                        <Award className="w-12 h-12 text-primary/50" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <span className="px-4 py-2 rounded-lg bg-background/90 text-sm font-medium">
+                        {t('certificates.view')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-5 flex-1 flex flex-col">
+                    <h3 className="font-semibold mb-2 line-clamp-2 group-hover:text-primary transition-colors">
+                      {cert.name}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-3">{cert.issuer}</p>
+                    
+                    <div className="flex items-center justify-between mt-auto">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Calendar className="w-3 h-3" />
+                        {new Date(cert.issueDate).toLocaleDateString('en', { month: 'short', year: 'numeric' })}
+                      </div>
+                      
+                      {cert.credentialUrl && (
+                        <a
+                          href={cert.credentialUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-primary hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          {t('certificates.verify')}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </motion.div>
+        ) : (
         <motion.div 
           layout 
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
@@ -187,9 +284,12 @@ export const CertificatesSection = () => {
             ))}
           </AnimatePresence>
         </motion.div>
+        )}
 
+        </div>
+        
         {/* Pagination Controls */}
-        {totalPages > 1 && (
+        {!isMobile && totalPages > 1 && (
           <div className="flex justify-center gap-4 mt-12">
             <button
               onClick={handlePrevPage}

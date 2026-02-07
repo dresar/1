@@ -1,13 +1,14 @@
 import { create } from 'zustand';
 import type { Project, Education, Certificate } from '@/types';
 
-export type ModalType = 'project' | 'education-gallery' | 'education-document' | 'certificate' | null;
+export type ModalType = 'project' | 'education-gallery' | 'education-document' | 'certificate' | 'experience-gallery' | null;
 
 interface ModalState {
   isOpen: boolean;
   modalType: ModalType;
   projectData: Project | null;
   educationData: Education | null;
+  experienceData: any | null;
   documentUrl: string | null;
   documentTitle: string | null;
   certificateData: Certificate | null;
@@ -16,6 +17,7 @@ interface ModalState {
   openEducationGalleryModal: (education: Education) => void;
   openEducationDocumentModal: (url: string, title: string) => void;
   openCertificateModal: (certificate: Certificate) => void;
+  openExperienceGalleryModal: (experience: any) => void;
   closeModal: () => void;
 }
 
@@ -24,6 +26,7 @@ export const useModalStore = create<ModalState>((set) => ({
   modalType: null,
   projectData: null,
   educationData: null,
+  experienceData: null,
   documentUrl: null,
   documentTitle: null,
   certificateData: null,
@@ -53,11 +56,18 @@ export const useModalStore = create<ModalState>((set) => ({
     certificateData: certificate,
   }),
 
+  openExperienceGalleryModal: (experience) => set({
+    isOpen: true,
+    modalType: 'experience-gallery',
+    experienceData: experience,
+  }),
+
   closeModal: () => set({
     isOpen: false,
     modalType: null,
     projectData: null,
     educationData: null,
+    experienceData: null,
     documentUrl: null,
     documentTitle: null,
     certificateData: null,
