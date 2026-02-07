@@ -17,11 +17,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from '@/components/ui/badge';
 import MDEditor from '@uiw/react-md-editor';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CategoryManager } from './CategoryManager';
+import { Controller } from 'react-hook-form';
 
 const projectSchema = z.object({
-  title: z.string().min(1, "Judul diperlukan"),
-  slug: z.string().optional(),
-  description: z.string().optional(), // Short description
+    title: z.string().min(1, "Judul diperlukan"),
+    slug: z.string().optional(),
+    categoryId: z.coerce.number({ invalid_type_error: "Kategori wajib dipilih" }).min(1, "Kategori wajib dipilih"),
+    description: z.string().optional(), // Short description
   content: z.string().optional(), // Markdown content
   coverImage: z.string().optional(),
   videoUrl: z.string().optional(),
@@ -42,6 +46,7 @@ export default function ProjectForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [summaries, setSummaries] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [isManualSummaryOpen, setIsManualSummaryOpen] = useState(false);
@@ -63,10 +68,20 @@ export default function ProjectForm() {
   const gallery = galleryJson ? JSON.parse(galleryJson) : [];
 
   useEffect(() => {
+    loadCategories();
     if (id) {
       loadProject(Number(id));
     }
   }, [id]);
+
+  const loadCategories = async () => {
+      try {
+          const res = await api.projectCategories.getAll();
+          setCategories(res);
+      } catch (e) {
+          console.error("Failed to load categories", e);
+      }
+  };
 
   const loadProject = async (projectId: number) => {
     setIsLoading(true);
@@ -105,6 +120,7 @@ export default function ProjectForm() {
         form.reset({
           title: project.title,
           slug: project.slug || '',
+          categoryId: project.categoryId,
           description: project.description,
           content: project.content,
           coverImage: project.coverImage || '',
@@ -334,6 +350,16 @@ export default function ProjectForm() {
       form.setValue('gallery', JSON.stringify(updated), { shouldDirty: true });
   };
 
+  const onError = (errors: any) => {
+      if (errors.categoryId) {
+          toast({ variant: "destructive", title: "Validasi Gagal", description: "Mohon pilih Kategori Project terlebih dahulu." });
+      } else if (errors.title) {
+          toast({ variant: "destructive", title: "Validasi Gagal", description: "Judul project wajib diisi." });
+      } else {
+          toast({ variant: "destructive", title: "Validasi Gagal", description: "Mohon lengkapi data yang diperlukan." });
+      }
+  };
+
   if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
 
   return (
@@ -345,7 +371,7 @@ export default function ProjectForm() {
         <h1 className="text-2xl font-bold">{id ? 'Edit Project' : 'Tambah Project Baru'}</h1>
       </div>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={form.handleSubmit(onSubmit, onError)} className="space-y-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left Column: Main Info */}
             <div className="lg:col-span-2 space-y-6">
@@ -362,6 +388,37 @@ export default function ProjectForm() {
                         <div className="space-y-2">
                             <Label>Slug (Opsional)</Label>
                             <Input {...form.register('slug')} placeholder="url-project-anda" />
+                        </div>
+
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                                <Label>Kategori</Label>
+                                <CategoryManager />
+                            </div>
+                            <Controller
+                                control={form.control}
+                                name="categoryId"
+                                render={({ field }) => (
+                                    <Select 
+                                        value={field.value?.toString()} 
+                                        onValueChange={(val) => field.onChange(Number(val))}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Pilih Kategori" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {categories.map((cat: any) => (
+                                                <SelectItem key={cat.id} value={cat.id.toString()}>
+                                                    {cat.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                            />
+                            {form.formState.errors.categoryId && (
+                                <p className="text-sm text-destructive mt-1">{form.formState.errors.categoryId.message}</p>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

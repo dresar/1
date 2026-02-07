@@ -4,14 +4,17 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { api } from '../../services/api';
-import { Loader2, Plus, Trash2, Edit, ExternalLink, Github, Youtube, Layers, MoreVertical, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, Plus, Trash2, Edit, ExternalLink, Github, Youtube, Layers, MoreVertical, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { normalizeMediaUrl } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function ProjectList() {
   const [projects, setProjects] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -22,7 +25,17 @@ export default function ProjectList() {
 
   useEffect(() => {
     loadProjects();
+    loadCategories();
   }, []);
+
+  const loadCategories = async () => {
+      try {
+          const res = await api.projectCategories.getAll();
+          setCategories(res);
+      } catch (e) {
+          console.error("Failed to load categories", e);
+      }
+  };
 
   const loadProjects = async () => {
     setIsLoading(true);
@@ -57,10 +70,14 @@ export default function ProjectList() {
   };
 
   // Pagination Logic
-  const totalPages = Math.ceil(projects.length / itemsPerPage);
+  const filteredProjects = selectedCategory === "all" 
+      ? projects 
+      : projects.filter(p => p.categoryId?.toString() === selectedCategory);
+
+  const totalPages = Math.ceil(filteredProjects.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = projects.slice(indexOfFirstItem, indexOfLastItem);
+  const currentItems = filteredProjects.slice(indexOfFirstItem, indexOfLastItem);
 
   if (isLoading) {
       return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -68,11 +85,28 @@ export default function ProjectList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Daftar Project</h1>
-        <Button onClick={() => navigate('/admin/projects/new')}>
-          <Plus className="mr-2 h-4 w-4" /> Tambah Project
-        </Button>
+        <div className="flex gap-2 w-full md:w-auto">
+             <div className="w-[200px]">
+                <Select value={selectedCategory} onValueChange={(val) => { setSelectedCategory(val); setCurrentPage(1); }}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Filter Kategori" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Semua Kategori</SelectItem>
+                        {categories.map((cat: any) => (
+                            <SelectItem key={cat.id} value={cat.id.toString()}>
+                                {cat.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <Button onClick={() => navigate('/admin/projects/new')}>
+            <Plus className="mr-2 h-4 w-4" /> Tambah Project
+            </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
