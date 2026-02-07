@@ -16,6 +16,7 @@ export const ProjectsSection = () => {
   const [activeFilter, setActiveFilter] = useState<number | 'all'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [summaryProject, setSummaryProject] = useState<any>(null);
+  const [summaryIndex, setSummaryIndex] = useState(0);
   const itemsPerPage = 15; // Show 15 projects per page with pagination
   const { projects = [], isLoading, isError } = useProjects();
 
@@ -149,6 +150,13 @@ export const ProjectsSection = () => {
                     className="absolute top-2 right-2 z-20 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm hover:bg-primary hover:text-white transition-colors shadow-sm"
                     onClick={(e) => {
                       e.stopPropagation();
+                      // Randomize index if summaries exist to show different variations
+                      if (project.summaries && project.summaries.length > 0) {
+                          const randomIndex = Math.floor(Math.random() * project.summaries.length);
+                          setSummaryIndex(randomIndex);
+                      } else {
+                          setSummaryIndex(0);
+                      }
                       setSummaryProject(project);
                     }}
                     title={t('projects.ai_summary')}
@@ -267,6 +275,7 @@ export const ProjectsSection = () => {
           isOpen={!!summaryProject}
           onClose={() => setSummaryProject(null)}
           project={summaryProject}
+          startIndex={summaryIndex}
         />
 
         {/* Empty State */}

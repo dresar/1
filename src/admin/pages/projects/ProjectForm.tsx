@@ -14,6 +14,7 @@ import { Loader2, Plus, Trash2, ArrowLeft, Image as ImageIcon, Sparkles, Github,
 import { Switch } from '@/components/ui/switch';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from '@/components/ui/badge';
 import MDEditor from '@uiw/react-md-editor';
 
@@ -43,6 +44,8 @@ export default function ProjectForm() {
   const [summaries, setSummaries] = useState<any[]>([]);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [isManualSummaryOpen, setIsManualSummaryOpen] = useState(false);
+  const [manualSummaryContent, setManualSummaryContent] = useState('');
 
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
@@ -72,6 +75,33 @@ export default function ProjectForm() {
       const project = await api.projects.getById(projectId);
       
       if (project) {
+        // Helper to safely parse tech stack
+        const parseTech = (val: any): string => {
+            if (Array.isArray(val)) return val.join(', ');
+            if (typeof val === 'string') {
+                try {
+                    // Try to parse if it looks like JSON array
+                    if (val.trim().startsWith('[')) {
+                        const parsed = JSON.parse(val);
+                        // Recursive check for double encoding (handling the user's specific corrupted data case)
+                        if (Array.isArray(parsed)) {
+                            return parsed.map(item => {
+                                // If item itself is a JSON string array (corrupted case), try to fix
+                                if (typeof item === 'string' && item.startsWith('[')) {
+                                    try { return JSON.parse(item); } catch { return item; }
+                                }
+                                return item;
+                            }).flat().join(', ');
+                        }
+                    }
+                } catch (e) {
+                    // Ignore parse error, use as string
+                }
+                return val;
+            }
+            return '';
+        };
+
         form.reset({
           title: project.title,
           slug: project.slug || '',
@@ -81,7 +111,7 @@ export default function ProjectForm() {
           videoUrl: project.videoUrl || '',
           demoUrl: project.demoUrl || '',
           repoUrl: project.repoUrl || '',
-          tech: Array.isArray(project.tech) ? project.tech.join(', ') : project.tech,
+          tech: parseTech(project.tech),
           gallery: typeof project.gallery === 'string' ? project.gallery : JSON.stringify(project.gallery || []),
           is_published: project.is_published
         });
@@ -108,7 +138,8 @@ export default function ProjectForm() {
       const formattedData = {
         ...data,
         tech: data.tech ? data.tech.split(',').map(t => t.trim()).filter(Boolean) : [],
-        gallery: JSON.parse(data.gallery || '[]')
+        gallery: JSON.parse(data.gallery || '[]'),
+        summaries: summaries
       };
 
       let projectId = Number(id);
@@ -116,11 +147,12 @@ export default function ProjectForm() {
       if (id) {
         await api.projects.update(Number(id), formattedData);
         toast({ title: "Berhasil", description: "Project diperbarui." });
+        navigate('/admin/projects');
       } else {
         const res = await api.projects.create(formattedData);
         projectId = res.id;
         toast({ title: "Berhasil", description: "Project dibuat." });
-        navigate(`/admin/projects/edit/${res.id}`, { replace: true });
+        navigate('/admin/projects');
       }
       
     } catch (error) {
@@ -218,27 +250,37 @@ export default function ProjectForm() {
   };
 
   const handleManualSummary = () => {
-      if (!id) {
-          toast({ variant: "destructive", title: "Simpan Project Dulu", description: "Silakan simpan project sebelum menambah summary." });
-          return;
-      }
-      const content = prompt("Masukkan ringkasan manual:");
-      if (!content) return;
+      setManualSummaryContent('');
+      setIsManualSummaryOpen(true);
+  };
 
-      api.projects.createSummary(Number(id), { content, variant: 'Manual' })
-          .then((res) => {
-              setSummaries(prev => [res, ...prev]);
-              toast({ title: "Berhasil", description: "Summary manual ditambahkan." });
-          })
-          .catch(() => toast({ variant: "destructive", title: "Gagal", description: "Gagal menyimpan summary." }));
+  const handleSaveManualSummary = async () => {
+      if (!manualSummaryContent.trim()) return;
+      
+      if (id) {
+          try {
+            const res = await api.projects.createSummary(Number(id), { content: manualSummaryContent, variant: 'Manual' });
+            setSummaries(prev => [res, ...prev]);
+            toast({ title: "Berhasil", description: "Summary manual ditambahkan." });
+            setIsManualSummaryOpen(false);
+          } catch (error) {
+            toast({ variant: "destructive", title: "Gagal", description: "Gagal menyimpan summary." });
+          }
+      } else {
+          // Local state for new project
+          const newSummary = {
+              id: Date.now(), // Temp ID
+              content: manualSummaryContent,
+              variant: 'Manual',
+              createdAt: new Date().toISOString()
+          };
+          setSummaries(prev => [newSummary, ...prev]);
+          toast({ title: "Berhasil", description: "Summary ditambahkan (akan disimpan saat project dibuat)." });
+          setIsManualSummaryOpen(false);
+      }
   };
 
   const handleGenerateSummary = async () => {
-      if (!id) {
-          toast({ variant: "destructive", title: "Simpan Project Dulu", description: "Silakan simpan project sebelum generate summary." });
-          return;
-      }
-
       setIsAnalyzing(true);
       try {
           // Generate Summary based on Content
@@ -253,13 +295,23 @@ export default function ProjectForm() {
           
           const result = await api.ai.generateContent({ prompt });
           
-          // Save to DB
-          await api.projects.createSummary(Number(id), { content: result.content, variant: 'AI Generated' });
-          
-          // Refresh summaries (manually fetch or add to state)
-          setSummaries(prev => [{ id: Date.now(), content: result.content, variant: 'AI Generated', createdAt: new Date().toISOString() }, ...prev]);
-          
-          toast({ title: "Summary Dibuat", description: "Ringkasan baru berhasil ditambahkan." });
+          if (id) {
+            // Save to DB
+            await api.projects.createSummary(Number(id), { content: result.content, variant: 'AI Generated' });
+            // Refresh summaries
+            setSummaries(prev => [{ id: Date.now(), content: result.content, variant: 'AI Generated', createdAt: new Date().toISOString() }, ...prev]);
+            toast({ title: "Summary Dibuat", description: "Ringkasan baru berhasil ditambahkan." });
+          } else {
+             // Local state only
+            const newSummary = {
+                id: Date.now(),
+                content: result.content,
+                variant: 'AI Generated',
+                createdAt: new Date().toISOString()
+            };
+            setSummaries(prev => [newSummary, ...prev]);
+            toast({ title: "Summary Dibuat", description: "Ringkasan berhasil di-generate (akan disimpan saat project dibuat)." });
+          }
       } catch (e) {
           toast({ variant: "destructive", title: "Gagal", description: "Gagal membuat summary." });
       } finally {
@@ -394,7 +446,6 @@ export default function ProjectForm() {
                 </Card>
                 
                 {/* AI Summaries Section */}
-                {id && (
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -432,7 +483,11 @@ export default function ProjectForm() {
                                                 className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                                                 onClick={async () => {
                                                     if(!summary.id) return;
-                                                    await api.projects.deleteSummary(summary.id);
+                                                    if (id) {
+                                                        try {
+                                                            await api.projects.deleteSummary(summary.id);
+                                                        } catch (e) { console.error(e); }
+                                                    }
                                                     setSummaries(prev => prev.filter(s => s.id !== summary.id));
                                                 }}
                                             >
@@ -444,7 +499,6 @@ export default function ProjectForm() {
                             </div>
                         </CardContent>
                     </Card>
-                )}
             </div>
 
             {/* Right Column: Media & Settings */}
@@ -522,6 +576,32 @@ export default function ProjectForm() {
             </div>
         </div>
       </form>
+
+      <Dialog open={isManualSummaryOpen} onOpenChange={setIsManualSummaryOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Tambah Summary Manual</DialogTitle>
+                <DialogDescription>
+                    Tulis ringkasan manual untuk project ini. Ini akan muncul dalam rotasi "AI Summary" di halaman publik.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                    <Label>Konten Ringkasan</Label>
+                    <Textarea 
+                        value={manualSummaryContent}
+                        onChange={(e) => setManualSummaryContent(e.target.value)}
+                        placeholder="Project ini adalah..."
+                        className="min-h-[100px]"
+                    />
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsManualSummaryOpen(false)}>Batal</Button>
+                <Button onClick={handleSaveManualSummary}>Simpan Summary</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

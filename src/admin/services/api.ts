@@ -421,6 +421,22 @@ export const api = {
     },
     create: async (data: CreateProjectDTO): Promise<Project> => {
       const response = await apiClient.post<Project>('/projects', data);
+      
+      // Handle summaries if provided in initial creation
+      if (data.summaries && data.summaries.length > 0 && response.data.id) {
+        try {
+          // Sequentially create summaries
+          for (const summary of data.summaries) {
+            await apiClient.post(`/projects/${response.data.id}/summaries`, {
+              content: summary.content,
+              variant: summary.variant || 'Standard'
+            });
+          }
+        } catch (e) {
+          console.error("Failed to create initial summaries", e);
+        }
+      }
+      
       return response.data;
     },
     update: async (id: number, data: UpdateProjectDTO): Promise<Project> => {
