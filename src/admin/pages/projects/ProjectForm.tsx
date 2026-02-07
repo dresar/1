@@ -42,6 +42,7 @@ export default function ProjectForm() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [summaries, setSummaries] = useState<any[]>([]);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
@@ -190,6 +191,32 @@ export default function ProjectForm() {
       }
   };
 
+  const handleGenerateShortSummary = async () => {
+      const title = form.getValues('title');
+      const base = form.getValues('content') || form.getValues('description') || title;
+      if (!title && !base) {
+          toast({ variant: "destructive", title: "Data Kurang", description: "Isi judul atau deskripsi terlebih dahulu." });
+          return;
+      }
+      setIsGeneratingSummary(true);
+      try {
+          const prompt = `
+            Buat ringkasan singkat (maks 3 kalimat) dalam bahasa Indonesia untuk kartu project.
+            Judul: ${title}
+            Konteks: ${base}
+          `;
+          const result = await api.ai.generateContent({ prompt });
+          if (result.content) {
+              form.setValue('description', result.content, { shouldDirty: true });
+              toast({ title: "Ringkasan Dibuat", description: "Deskripsi singkat diisi oleh AI." });
+          }
+      } catch (_) {
+          toast({ variant: "destructive", title: "Gagal", description: "Tidak dapat membuat ringkasan." });
+      } finally {
+          setIsGeneratingSummary(false);
+      }
+  };
+
   const handleManualSummary = () => {
       if (!id) {
           toast({ variant: "destructive", title: "Simpan Project Dulu", description: "Silakan simpan project sebelum menambah summary." });
@@ -321,7 +348,22 @@ export default function ProjectForm() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
-                            <Label>Deskripsi Singkat</Label>
+                            <div className="flex items-center justify-between">
+                                <Label>Deskripsi Singkat</Label>
+                                <div className="flex gap-2">
+                                    <Button 
+                                        type="button" 
+                                        variant="outline" 
+                                        size="sm" 
+                                        onClick={handleGenerateShortSummary}
+                                        disabled={isGeneratingSummary}
+                                        className="h-8 text-xs"
+                                    >
+                                        {isGeneratingSummary ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Sparkles className="h-3 w-3 mr-2 text-purple-500" />}
+                                        Generate Ringkasan AI
+                                    </Button>
+                                </div>
+                            </div>
                             <Textarea {...form.register('description')} placeholder="Ringkasan pendek untuk kartu project..." />
                             <p className="text-xs text-muted-foreground">Digunakan untuk kartu project dan bisa jadi dasar generate konten detail.</p>
                         </div>
